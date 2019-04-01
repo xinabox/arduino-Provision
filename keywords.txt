@@ -1,0 +1,38 @@
+#######################################
+# Syntax Coloring Map For arduino-Provision
+#######################################
+
+#######################################
+# Instance	(KEYWORD1)
+#######################################
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+addWiFi	KEYWORD2
+addCloudToken	KEYWORD2
+addUbiDotsToken	KEYWORD2
+addBlynkToken	KEYWORD2
+addAzureToken	KEYWORD2
+addMQTT	KEYWORD2
+optionBlinkLED	KEYWORD2
+printConfigJson	KEYWORD2
+transmit	KEYWORD2
+recieve	KEYWORD2
+success	KEYWORD2
+getWiFi	KEYWORD2
+getMQTT	KEYWORD2
+getUbiDotsToken	KEYWORD2
+getAzureToken	KEYWORD2
+getBlynkToken	KEYWORD2
+getCloudToken	KEYWORD2
+enableLED	KEYWORD2
+BlinkLED	KEYWORD2
+
+#######################################
+# Constants	(LITERAL1)
+#######################################
+
+

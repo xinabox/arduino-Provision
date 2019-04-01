@@ -1,0 +1,27 @@
+{
+  "name": "arduino-Provision",
+  "keywords": "espressif iot easy provisioning xinabox cw01 cw02 dw03 cw03",
+  "description": "ESP32, ESP8266 and ATSAMW25 Provisioning Library for XinaBox Uploader",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xinabox/arduino-Provision"
+  },
+  "authors": [
+    {
+      "name": "XinaBox",
+      "email": "support@xinabox.cc",
+      "url": "https://xinabox.cc",
+      "maintainer": true
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "ArduinoJson",
+      "authors": "Benoit Blanchon",
+      "frameworks": "arduino"
+    }
+  ],
+  "version": "1.0.0",
+  "frameworks": "arduino",
+  "platforms": "*"
+}
