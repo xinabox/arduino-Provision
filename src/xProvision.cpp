@@ -116,9 +116,14 @@ bool xProvision::recieve(void)
             Serial.print("Provision Completed Successfully.");
             provision_successful = true;
         }
-
     }
-  
+}
+
+void xProvision::fail(void)
+{
+    Serial.print(SYNC); //Part of the provisioning standard 
+    Serial.print(SYNC); //Part of the provisioning standard
+    Serial.print("Provision Failed.");    
 }
 
 bool xProvision::success(void)

@@ -30,6 +30,7 @@ getBlynkToken	KEYWORD2
 getCloudToken	KEYWORD2
 enableLED	KEYWORD2
 BlinkLED	KEYWORD2
+fail    KEYWORD2
 
 #######################################
 # Constants	(LITERAL1)

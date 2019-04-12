@@ -49,6 +49,7 @@ class xProvision
         void enableLED(void);
         void BlinkLED(uint32_t _delay);
         void BlinkLED(void);
+        void fail(void);
 
     private:
         uint8_t tick_prov_wait = 0;
