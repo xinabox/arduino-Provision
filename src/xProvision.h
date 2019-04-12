@@ -23,7 +23,7 @@
 #define BAUDSPEED 115200
 #define SYNC "$!$"
 
-class xProvision:
+class xProvision
 {
     public:
         xProvision();
