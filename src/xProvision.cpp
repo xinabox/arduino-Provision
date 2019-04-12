@@ -31,16 +31,16 @@ bool xProvision::recieve(void)
     unsigned long currentTime = 0;
     currentTime = millis();
 
-    while ((!Serial.available()) && (tick_prov_wait < 10)) 
+    while ((!Serial.available()) && (tick_prov_wait < 100)) 
     {
-        if((millis() - currentTime) > 1000)
+        if((millis() - currentTime) > 100)
         {
             currentTime = millis();
             tick_prov_wait++;
         }
     }
 
-    if(tick_prov_wait == 10)
+    if(tick_prov_wait == 100)
     {
         Serial.print(SYNC); //Part of the provisioning standard
         Serial.print(SYNC); //Part of the provisioning standard
@@ -48,73 +48,87 @@ bool xProvision::recieve(void)
     }
     else
     {
-    //Receive Provision Data
-        String s = Serial.readStringUntil('\n');
+        //Receive Provision Data
+        String start = Serial.readStringUntil('\n');
 
-        StaticJsonBuffer<512> jsonBuffer;
-        JsonObject& root = jsonBuffer.parseObject(s);
-        if (!root.success()) {
-            Serial.print(SYNC); //Part of the provisioning standard
-            Serial.print(SYNC); //Part of the provisioning standard       
-            Serial.println("Something went wrong!");
-            return false;
-        } 
-        else
+        char str1[15] = "$!$$!$START";
+        char str2[15];
+
+        strcpy(str2, start.c_str());
+
+        int ret = strcmp(str2, str1);
+
+
+        if(ret == 13)
         {
-            //root.prettyPrintTo(Serial);
+            while (!Serial.available());
 
-            if(root.containsKey("WiFi_Network") && root.containsKey("WiFi_Password"))
-            {
-                _ssid = root["WiFi_Network"].as<String>();
-                _pwd  = root["WiFi_Password"].as<String>();
-            }
+            String s = Serial.readStringUntil('\n');
 
-            if(root.containsKey("MQTT_Server") && root.containsKey("MQTT_Port"))
-            {
-                _mqtt_server = root["MQTT_Server"].as<String>();
-                _mqtt_port = root["MQTT_Port"].as<String>();             
-            }
+            StaticJsonBuffer<512> jsonBuffer;
+            JsonObject& root = jsonBuffer.parseObject(s);
 
-            if(root.containsKey("UbiDots_Token"))
+            if (!root.success()) {
+                Serial.print(SYNC); //Part of the provisioning standard
+                Serial.print(SYNC); //Part of the provisioning standard       
+                Serial.println("Something went wrong!");
+                return false;
+            } 
+            else
             {
-                _ubidots_token  = root["UbiDots_Token"].as<String>();
-            }
-
-            if(root.containsKey("Blynk_Token"))
-            {
-                _blynk_token  = root["Blynk_Token"].as<String>();
-            }
-
-            if(root.containsKey("Azure_Token"))
-            {
-                _azure_token = root["Azure_Token"].as<String>();
-            }
-
-            if(root.containsKey("Cloud_Token"))
-            {
-                _cloud_token = root["Cloud_Token"].as<String>();
-            }
-
-            if(root.containsKey("LED_to_blink"))
-            {
-                _led = root["LED_to_blink"].as<String>();
-                switch (_led.charAt(0)) 
+                if(root.containsKey("WiFi_Network") && root.containsKey("WiFi_Password"))
                 {
-                    case 'R':
-                        blinkLED = LED_RED; 
-                        break;
-                    case 'G':
-                        blinkLED = LED_GREEN; 
-                        break;
-                    case 'B':
-                        blinkLED = LED_BUILTIN; 
-                        break;
+                    _ssid = root["WiFi_Network"].as<String>();
+                    _pwd  = root["WiFi_Password"].as<String>();
                 }
-            }
-            Serial.print(SYNC); //Part of the provisioning standard
-            Serial.print(SYNC); //Part of the provisioning standard
-            Serial.print("Provision Completed Successfully.");
-            provision_successful = true;
+
+                if(root.containsKey("MQTT_Server") && root.containsKey("MQTT_Port"))
+                {
+                    _mqtt_server = root["MQTT_Server"].as<String>();
+                    _mqtt_port = root["MQTT_Port"].as<String>();             
+                }
+
+                if(root.containsKey("UbiDots_Token"))
+                {
+                    _ubidots_token  = root["UbiDots_Token"].as<String>();
+                }
+
+                if(root.containsKey("Blynk_Token"))
+                {
+                    _blynk_token  = root["Blynk_Token"].as<String>();
+                }
+
+                if(root.containsKey("Azure_Token"))
+                {
+                    _azure_token = root["Azure_Token"].as<String>();
+                }
+
+                if(root.containsKey("Cloud_Token"))
+                {
+                    _cloud_token = root["Cloud_Token"].as<String>();
+                }
+
+                if(root.containsKey("LED_to_blink"))
+                {
+                    _led = root["LED_to_blink"].as<String>();
+                    switch (_led.charAt(0)) 
+                    {
+                        case 'R':
+                            blinkLED = LED_RED; 
+                            break;
+                        case 'G':
+                            blinkLED = LED_GREEN; 
+                            break;
+                        case 'B':
+                            blinkLED = LED_BUILTIN; 
+                            break;
+                    }
+                }
+                Serial.print(SYNC); //Part of the provisioning standard
+                Serial.print(SYNC); //Part of the provisioning standard
+                Serial.print("Provision Completed Successfully.");
+                provision_successful = true;
+            }    
         }
     }
 }
