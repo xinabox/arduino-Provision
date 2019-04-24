@@ -18,7 +18,7 @@ void setup() {
   //Writes this string, with the CRLF and SYNC prefixed and CRLF suffixed
   //$!${"WiFi_Network":"Your SSID","WiFi_Password":"Your PSK","Blynk_Token":"Long odd number"}
 
-  prv.recieve();
+  prv.receive();
   //Reads this string, with CRLF suffixed
   //{"WiFi_Network":"WiFi SSID","WiFi_Password":"WiFi PSK","Blynk_Token":"your blynk token"}
 

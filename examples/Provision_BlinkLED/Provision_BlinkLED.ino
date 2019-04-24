@@ -19,7 +19,7 @@ void setup() {
   //$!${""LED_to_blink":["Red","Green","Blue"]}
   //A nested array appears as a drop down list, the rest as text entry.
 
-  prv.recieve();
+  prv.receive();
   //Reads this string, with CRLF suffixed
   //{"LED_to_blink":"Red"}
   //Obvisouly with other data inserted, notice the dropdown comes back as the selected value.

@@ -21,9 +21,9 @@ void setup() {
   //Writes this string, with the CRLF and SYNC prefixed and CRLF suffixed
   //$!${"WiFi_Network":"Your SSID","WiFi_Password":"Your PSK"}
 
-  prv.recieve();
+  prv.receive();
   //Reads this string, with CRLF suffixed
-  //{"WiFi_Network":"XinaBox","WiFi_Password":"RapidIoT"}
+  //{"WiFi_Network":"Your-SSID","WiFi_Password":"Your-PSK"}
 
   if (prv.success())
   {
