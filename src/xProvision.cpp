@@ -1,7 +1,8 @@
 #include <xProvision.h>
 
 xProvision::xProvision(void)
-{   
+{
+    /* nothing to construct*/
 }
 
 xProvision::~xProvision(void)
@@ -28,7 +29,6 @@ void xProvision::retransmit(void)
         {
             if((jsonFile[0] != '{') || (strncmp(jsonFileStored.c_str(), jsonFile.c_str(), 5) == 0))
             {
-                //Serial.println("HelloWorld");
                 jsonFile = "";
                 merge_json(jsonFile, jsonFileStored);
             }            
@@ -490,7 +490,7 @@ void xProvision::merge_json(String obj1, String obj2)
 
     if(obj1[0] == '{' && obj1[1] == '}')
     {
-        Serial.println("FixNewJson");
+        //Serial.println("FixNewJson");
     }
 
     if (obj2[0] == '{')
