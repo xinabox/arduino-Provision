@@ -4,7 +4,7 @@
 
 #include <ArduinoJson.h>    // https://github.com/bblanchon/ArduinoJson
 #include <xProvision.h>     // https://github.com/xinabox/arduino-Provision    
-
+#include <ESP8266WiFi.h>
 xProvision prv;
 String ssid, password;
 
@@ -13,9 +13,15 @@ void setup() {
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_RED, OUTPUT);
 
+  // String uName = "/";
+  // uName += ESP.getChipID();
+  // uName += "XK01";
+
   // put your setup code here, to run once:
   prv.begin();
-  prv.addWiFi();
+  //prv.nameJsonFile(uName);
+  prv.addVariable("WiFi_SSID", "yourNetworkName");
+  prv.addVariable("WiFi_PSK", "yourNetworkPassword");
 
   prv.transmit();
   //Writes this string, with the CRLF and SYNC prefixed and CRLF suffixed
@@ -27,7 +33,10 @@ void setup() {
 
   if (prv.success())
   {
-    prv.getWiFi(ssid, password);
+    prv.getVariable("WiFi_SSID", ssid);
+    prv.getVariable("WiFi_PSK", password);
+    Serial.println(ssid);
+    Serial.println(password);
     WiFi.begin(ssid.c_str(), password.c_str());
 
     while (WiFi.status() != WL_CONNECTED) {

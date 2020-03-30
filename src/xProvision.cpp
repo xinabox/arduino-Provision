@@ -1,41 +1,76 @@
 #include <xProvision.h>
 
+/**
+ * @brief Construct a new xProvision::xProvision object
+ * 
+ */
 xProvision::xProvision(void)
 {
-    /* nothing to construct*/
+    jsonFileName = "xinaboxuploader.json";
 }
 
+/**
+ * @brief Construct a new x Provision::x Provision object
+ * 
+ * @param FileName 
+ */
+xProvision::xProvision(String FileName)
+{
+    jsonFileName = FileName;
+}
+
+/**
+ * @brief Destroy the xProvision::xProvision object
+ * 
+ */
 xProvision::~xProvision(void)
 {
     /*nothing to destruct*/
 }
 
+/**
+ * @brief 
+ * 
+ * @return true 
+ * @return false 
+ */
 bool xProvision::begin(void)
 {
     Serial.begin(BAUDSPEED);
     while (!Serial)
         continue;
-    Serial.println("START");
-
-    // read config file
+    Serial.println();
     return loadConfigFile(jsonFileStored);
 }
 
+/**
+ * @brief checks if there is an old config file to present to xinaboxuploader
+ * 
+ */
 void xProvision::retransmit(void)
 {
-    if(config_file_exists)
+    if (config_file_exists)
     {
-        if(strcmp(jsonFileStored.c_str(), jsonFile.c_str()) != 0)
+        if (strcmp(jsonFileStored.c_str(), jsonFile.c_str()) != 0)
         {
-            if((jsonFile[0] != '{') || (strncmp(jsonFileStored.c_str(), jsonFile.c_str(), 5) == 0))
+            // #ifdef DEBUG_SERIAL
+            // Serial.print("jsonFileStored - ");
+            // Serial.println(jsonFileStored);
+            // #endif
+
+            if ((jsonFile[0] != '{') || (strncmp(jsonFileStored.c_str(), jsonFile.c_str(), 5) == 0))
             {
                 jsonFile = "";
                 merge_json(jsonFile, jsonFileStored);
-            }            
+            }
         }
     }
 }
 
+/**
+ * @brief send data to xinaboxuploader
+ * 
+ */
 void xProvision::transmit(void)
 {
     retransmit();
@@ -43,22 +78,27 @@ void xProvision::transmit(void)
     printConfigJson();
 }
 
+/**
+ * @brief recieve data from xinaboxuploader
+ * 
+ * @return true data recieved with no errors
+ * @return false data not recieved or errors
+ */
 bool xProvision::receive(void)
 {
-    //Wait for data
-    unsigned long currentTime = 0;
-    currentTime = millis();
+    unsigned long currentTime = millis();
+    uint8_t tick_prov_wait = 0;
 
-    while ((!Serial.available()) && (tick_prov_wait < 100))
+    while ((!Serial.available()) && (tick_prov_wait < 40))
     {
-        if ((millis() - currentTime) > 100)
+        if ((millis() - currentTime) > 250)
         {
             currentTime = millis();
             tick_prov_wait++;
+            debugPrint("wait timer - ", tick_prov_wait);
         }
     }
-
-    if (tick_prov_wait == 100)
+    if (tick_prov_wait == 40)
     {
         Serial.print(SYNC); //Part of the provisioning standard
         Serial.print(SYNC); //Part of the provisioning standard
@@ -68,89 +108,38 @@ bool xProvision::receive(void)
     else
     {
         //Receive String to indicate provisioning will occur
-        String start = Serial.readStringUntil('\n');
+        //while (!Serial.available());
+        
+        String syncData = "";
+        syncData = Serial.readStringUntil('\n');
+        syncData += '\0';
 
-        if (strncmp(start.c_str(), "$!$$!$START", 11) == 0)
+        if (strncmp(syncData.c_str(), "$!$$!$START", 11) == 0)
         {
+            debugPrint("Ready to Recieve");
+
             while (!Serial.available());
-            String s = Serial.readStringUntil('\n');
 
-            DynamicJsonBuffer jsonBuffer;
-            JsonObject &root = jsonBuffer.parseObject(s);
-
-            if (!root.success())
-            {
-                Serial.print(SYNC); //Part of the provisioning standard
-                Serial.print(SYNC); //Part of the provisioning standard
-                Serial.println("Something went wrong!");
-                return false;
-            }
-            else
-            {
-                if (root.containsKey("WiFi_Network") && root.containsKey("WiFi_Password"))
-                {
-                    _ssid = root["WiFi_Network"].as<String>();
-                    _pwd = root["WiFi_Password"].as<String>();
-                }
-
-                if (root.containsKey("MQTT_Server") && root.containsKey("MQTT_Port"))
-                {
-                    _mqtt_server = root["MQTT_Server"].as<String>();
-                    _mqtt_port = root["MQTT_Port"].as<String>();
-                }
-
-                if (root.containsKey("UbiDots_Token"))
-                {
-                    _ubidots_token = root["UbiDots_Token"].as<String>();
-                }
-
-                if (root.containsKey("Blynk_Token"))
-                {
-                    _blynk_token = root["Blynk_Token"].as<String>();
-                }
-
-                if (root.containsKey("Azure_Token"))
-                {
-                    _azure_token = root["Azure_Token"].as<String>();
-                }
-
-                if (root.containsKey("Cloud_Token"))
-                {
-                    _cloud_token = root["Cloud_Token"].as<String>();
-                }
-
-                if (root.containsKey("LED_to_blink"))
-                {
-                    _led = root["LED_to_blink"].as<String>();
-                    switch (_led.charAt(0))
-                    {
-                    case 'R':
-                        blinkLED = LED_RED;
-                        break;
-                    case 'G':
-                        blinkLED = LED_GREEN;
-                        break;
-                    case 'B':
-                        blinkLED = LED_BUILTIN;
-                        break;
-                    }
-                }
-                Serial.print(SYNC); //Part of the provisioning standard
-                Serial.print(SYNC); //Part of the provisioning standard
-                Serial.print("Provision Completed Successfully.");
-                provision_successful = true;
-
-                return saveConfigFile(s);
-            }
+            String jsonInputStringUser = Serial.readStringUntil('\n');
+            provision_successful = true;
+            //Serial.println(jsonInputStringUser);
+            return saveConfigFile(jsonInputStringUser);
         }
         else
         {
-            //digitalWrite(LED_GREEN, HIGH);
+            Serial.println(syncData);
+            Serial.print(SYNC); //Part of the provisioning standard
+            Serial.print(SYNC); //Part of the provisioning standard
+            Serial.println("Provision Ended, Bad Sync!");
+            return false;
         }
     }
-    return true;
 }
 
+/**
+ * @brief prints provision failed to xinaboxuploader
+ * 
+ */
 void xProvision::fail(void)
 {
     Serial.print(SYNC); //Part of the provisioning standard
@@ -158,228 +147,65 @@ void xProvision::fail(void)
     Serial.print("Provision Failed.");
 }
 
+/**
+ * @brief function to check for succesful provision
+ * 
+ * @return true 
+ * @return false 
+ */
 bool xProvision::success(void)
 {
     return provision_successful;
 }
 
-void xProvision::addWiFi(void)
-{
-    StaticJsonBuffer<200> jsonBuffer;
-    JsonObject &root = jsonBuffer.createObject();
-    root["WiFi_Network"] = "YourSSID";
-    root["WiFi_Password"] = "YourPSK";
-
-    size_t len = root.measureLength();
-    size_t size = len + 1;
-    char json[size];
-    char _json[size];
-    root.printTo(json, size);
-    for (int i = 0; i <= (int)size; i++)
-    {
-        _json[i] = json[i + 1];
-    }
-    _json[size - 3] = '\0';
-    //Serial.println(_json);
-    buildConfigJson(_json);
-}
-
-bool xProvision::getWiFi(String &ssid, String &psk)
-{
-    if ((_ssid[0] == '\0') || (_pwd[0] == '\0'))
-    {
-        return false;
-    }
-    ssid = _ssid;
-    psk = _pwd;
-    return true;
-}
-
-void xProvision::addMQTT(void)
-{
-    StaticJsonBuffer<200> jsonBuffer;
-    JsonObject &root = jsonBuffer.createObject();
-    root["MQTT_Server"] = "ServerHostname";
-    root["MQTT_Port"] = "ServerPort";
-
-    size_t len = root.measureLength();
-    size_t size = len + 1;
-    char json[size];
-    char _json[size];
-    root.printTo(json, size);
-    for (int i = 0; i <= (int)size; i++)
-    {
-        _json[i] = json[i + 1];
-    }
-    _json[size - 3] = '\0';
-    //Serial.println(_json);
-    buildConfigJson(_json);
-}
-
-bool xProvision::getMQTT(String &mqtt, String &port)
-{
-    if ((_mqtt_server[0] == '\0') || (_mqtt_port[0] == '\0'))
-    {
-        return false;
-    }
-    mqtt = _mqtt_server;
-    port = _mqtt_port;
-    return true;
-}
-
-void xProvision::addUbiDotsToken(void)
-{
-    StaticJsonBuffer<200> jsonBuffer;
-    JsonObject &root = jsonBuffer.createObject();
-    root["UbiDots_Token"] = "YourUbitdotsToken";
-
-    size_t len = root.measureLength();
-    size_t size = len + 1;
-    char json[size];
-    char _json[size];
-    root.printTo(json, size);
-    for (int i = 0; i <= (int)size; i++)
-    {
-        _json[i] = json[i + 1];
-    }
-    _json[size - 3] = '\0';
-    //Serial.println(_json);
-    buildConfigJson(_json);
-}
-
-bool xProvision::getUbiDotsToken(String &var1)
-{
-    if (_ubidots_token[0] == '\0')
-    {
-        return false;
-    }
-    var1 = _ubidots_token;
-    return true;
-}
-
-void xProvision::addAzureToken(void)
-{
-    StaticJsonBuffer<200> jsonBuffer;
-    JsonObject &root = jsonBuffer.createObject();
-    root["Azure_Token"] = "YourAzureToken";
-
-    size_t len = root.measureLength();
-    size_t size = len + 1;
-    char json[size];
-    char _json[size];
-    root.printTo(json, size);
-    for (int i = 0; i <= (int)size; i++)
-    {
-        _json[i] = json[i + 1];
-    }
-    _json[size - 3] = '\0';
-    //Serial.println(_json);
-    buildConfigJson(_json);
-}
-
-bool xProvision::getAzureToken(String &var1)
-{
-    if (_azure_token[0] == '\0')
-    {
-        return false;
-    }
-    var1 = _azure_token;
-    return true;
-}
-
-void xProvision::addBlynkToken(void)
-{
-    StaticJsonBuffer<200> jsonBuffer;
-    JsonObject &root = jsonBuffer.createObject();
-    root["Blynk_Token"] = "YourBlynkToken";
-
-    size_t len = root.measureLength();
-    size_t size = len + 1;
-    char json[size];
-    char _json[size];
-    root.printTo(json, size);
-    for (int i = 0; i <= (int)size; i++)
-    {
-        _json[i] = json[i + 1];
-    }
-    _json[size - 3] = '\0';
-    //Serial.println(_json);
-    buildConfigJson(_json);
-}
-
-bool xProvision::getBlynkToken(String &var1)
-{
-    if (_blynk_token[0] == '\0')
-    {
-        return false;
-    }
-    var1 = _blynk_token;
-    return true;
-}
-
-void xProvision::addCloudToken(void)
-{
-    StaticJsonBuffer<200> jsonBuffer;
-    JsonObject &root = jsonBuffer.createObject();
-    root["Cloud_Token"] = "YourCloudToken";
-
-    size_t len = root.measureLength();
-    size_t size = len + 1;
-    char json[size];
-    char _json[size];
-    root.printTo(json, size);
-    for (int i = 0; i <= (int)size; i++)
-    {
-        _json[i] = json[i + 1];
-    }
-    _json[size - 3] = '\0';
-    //Serial.println(_json);
-    buildConfigJson(_json);
-}
-
-bool xProvision::getCloudToken(String &var1)
-{
-    if (_cloud_token[0] == '\0')
-    {
-        return false;
-    }
-    var1 = _cloud_token;
-    return true;
-}
-
+/**
+ * @brief templete to add led option to blink
+ * 
+ */
 void xProvision::optionBlinkLED(void)
 {
-    StaticJsonBuffer<200> jsonBuffer;
-    JsonObject &root = jsonBuffer.createObject();
-    JsonArray &data = root.createNestedArray("LED_to_blink");
+    StaticJsonDocument<256> doc;
+    JsonArray data = doc.createNestedArray("LED_to_blink");
     data.add("Red");
     data.add("Green");
     data.add("Blue");
 
-    size_t len = root.measureLength();
-    size_t size = len + 1;
-    char json[size];
-    char _json[size];
-    root.printTo(json, size);
-    for (int i = 0; i <= (int)size; i++)
+    char json[256];
+    char _json[256];
+    size_t n = serializeJson(doc, json);
+
+    for (int i = 0; i <= n; i++)
     {
         _json[i] = json[i + 1];
     }
-    _json[size - 3] = '\0';
-    //Serial.println(_json);
+    _json[n - 2] = '\0';
+    //debugPrint(_json);
     buildConfigJson(_json);
 }
 
+/**
+ * @brief enable the LED selected from xinaboxuploader
+ * 
+ */
 void xProvision::enableLED(void)
 {
     pinMode(blinkLED, OUTPUT);
 }
 
+/**
+ * @brief 
+ * 
+ */
 void xProvision::BlinkLED(void)
 {
     BlinkLED(1000);
 }
 
+/**
+ * @brief 
+ * 
+ * @param _delay 
+ */
 void xProvision::BlinkLED(uint32_t _delay)
 {
     digitalWrite(blinkLED, HIGH);
@@ -388,6 +214,10 @@ void xProvision::BlinkLED(uint32_t _delay)
     delay(_delay);
 }
 
+/**
+ * @brief print the current config file
+ * 
+ */
 void xProvision::printConfigJson(void)
 {
     char prov[total + 5];
@@ -398,6 +228,10 @@ void xProvision::printConfigJson(void)
     Serial.println(prov);
 }
 
+/**
+ * @brief 
+ * 
+ */
 void xProvision::end(void)
 {
     Serial.print(SYNC); //Part of the provisioning standard
@@ -405,6 +239,11 @@ void xProvision::end(void)
     Serial.print("Provision Completed Successfully.");
 }
 
+/**
+ * @brief 
+ * 
+ * @param var 
+ */
 void xProvision::end(String var)
 {
     Serial.print(SYNC); //Part of the provisioning standard
@@ -412,68 +251,94 @@ void xProvision::end(String var)
     Serial.print(var);
 }
 
+/**
+ * @brief add custrom named variable
+ * 
+ * @param var1 data name
+ * @param var2 data initial condition
+ */
 void xProvision::addVariable(String var1, String var2)
 {
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject &root = jsonBuffer.createObject();
-    root[var1] = var2;
+    StaticJsonDocument<256> doc;
+    doc[var1] = var2;
 
-    size_t len = root.measureLength();
-    size_t size = len + 1;
-    char json[size];
-    char _json[size];
-    root.printTo(json, size);
-    for (int i = 0; i <= (int)size; i++)
+    char json[256];
+    char _json[256];
+    size_t n = serializeJson(doc, json);
+
+    for (int i = 0; i <= n; i++)
     {
         _json[i] = json[i + 1];
     }
-    _json[size - 3] = '\0';
+    _json[n - 2] = '\0';
+    //debugPrint(_json);
     buildConfigJson(_json);
 }
 
+/**
+ * @brief get custom user variable data
+ * 
+ * @param var1 custom data name
+ * @param var2 value of custom data
+ * @return true 
+ * @return false 
+ */
 bool xProvision::getVariable(String var1, String &var2)
 {
-    if (config_file_exists)
+    //debugPrint("getVariable()");
+    if (loadConfigFile(jsonFileStored))
     {
-        if(loadConfigFile(jsonFileStored))
-        {
-            return CHECK_XINABOX_JSON(var1, var2);
-        }
-        return false;
+        return checkConfigDataForVariable(var1, var2);
     }
+    //Serial.println("File load fail");
     return false;
 }
 
+/**
+ * @brief Add a custom json string for advvanced configs
+ * 
+ * @param var1 
+ */
 void xProvision::addCustomJson(String var1)
 {
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject &root = jsonBuffer.parseObject(var1);
+    const size_t size = sizeof(var1);
+    DynamicJsonDocument doc(size);
+    DeserializationError error = deserializeJson(doc, var1);
 
-    size_t len = root.measureLength();
-    size_t size = len + 1;
     char json[size];
     char _json[size];
-    root.printTo(json, size);
-    for (int i = 0; i <= (int)size; i++)
+    size_t n = serializeJson(doc, json);
+
+    for (int i = 0; i <= n; i++)
     {
         _json[i] = json[i + 1];
     }
-    _json[size - 3] = '\0';
+    _json[n - 2] = '\0';
+    //debugPrint(_json);
     buildConfigJson(_json);
 }
 
+/**
+ * @brief build new config file from two json files
+ * 
+ * @param _json file to merge
+ */
 void xProvision::buildConfigJson(String _json)
 {
     merge_json(jsonFile, _json);
 }
 
+/**
+ * @brief merge two json files
+ * 
+ * @param obj1 json file 1 
+ * @param obj2 json file 2
+ */
 void xProvision::merge_json(String obj1, String obj2)
 {
-    /*
-    Serial.println("MergeDocs");
-    Serial.println(obj1);
-    Serial.println(obj2);
-    */
+    // debugPrint("MergeDocs");
+    // debugPrint(obj1);
+    // debugPrint(obj2);
 
     uint16_t len1 = strlen(obj1.c_str());
     uint16_t len2 = strlen(obj2.c_str());
@@ -488,9 +353,9 @@ void xProvision::merge_json(String obj1, String obj2)
         len1 = strlen(obj1.c_str());
     }
 
-    if(obj1[0] == '{' && obj1[1] == '}')
+    if (obj1[0] == '{' && obj1[1] == '}')
     {
-        //Serial.println("FixNewJson");
+        //debugPrint("FixNewJson");
     }
 
     if (obj2[0] == '{')
@@ -553,92 +418,106 @@ void xProvision::merge_json(String obj1, String obj2)
     }
 }
 
+/**
+ * @brief reset the current config file
+ * 
+ */
 void xProvision::reset(void)
 {
     jsonFile = jsonFileStored = "";
 }
 
+/**
+ * @brief save current config file to FS
+ * 
+ * @return true 
+ * @return false 
+ */
 bool xProvision::saveConfigFile(void)
 {
-    if(strcmp(jsonFileStored.c_str(), jsonFile.c_str()) != 0)
+    if (strcmp(jsonFileStored.c_str(), jsonFile.c_str()) != 0)
     {
-        return store_data(jsonFile);
+        return saveFile(jsonFile);
     }
     return true;
 }
 
+/**
+ * @brief save custom config file
+ * 
+ * @param json custom user config file
+ * @return true 
+ * @return false 
+ */
 bool xProvision::saveConfigFile(String json)
 {
-    if(strcmp(jsonFileStored.c_str(), json.c_str()) != 0)
+    if (strcmp(jsonFileStored.c_str(), json.c_str()) != 0)
     {
-        return store_data(json);
+        return !errorHandlers(saveFile(json));
     }
     return true;
 }
 
+/**
+ * @brief load config file from FS
+ * 
+ * @param var1 to store cofnig data inn
+ * @return true 
+ * @return false 
+ */
 bool xProvision::loadConfigFile(String &var1)
 {
-    return load_data(var1);
+    return !errorHandlers(loadFile(var1));
 }
 
-bool xProvision::store_data(String json)
+/**
+ * @brief write config file to FS
+ * 
+ * @param json config file to write to FS
+ * @return true 
+ * @return false 
+ */
+uint8_t xProvision::saveFile(String userJson)
 {
-    return writeFile(json);
-}
-
-bool xProvision::load_data(String &json)
-{
-    return readFile(json);
-}
-
-bool xProvision::writeFile(String json)
-{
-    //File xinaboxFile = SPIFFS.open("/xinaboxuploader.json", "r");
-
-    if (SPIFFS.begin())
+    //debugPrint(userJson);
+    if (SPIFFS.begin()) // start the FS
     {
-        //File xinaboxFile = SPIFFS.open("/xinaboxuploader.json", "r");
+        File xinaboxFile = SPIFFS.open(jsonFileName, "w");
 
-        if (SPIFFS.exists("/xinaboxuploader.json")) // search for xinaboxuploader.json
-        { 
-            config_file_exists = true; //file exists, reading and loading
-
-            File xinaboxFile = SPIFFS.open("/xinaboxuploader.json", "w");
-
-            if (xinaboxFile)
+        if (xinaboxFile)
+        {
+            size_t sizeJson = strlen(userJson.c_str());
+            char json[sizeJson];
+            strcpy(json, userJson.c_str());
+            DynamicJsonDocument doc(sizeJson * 2);
+            DeserializationError error = deserializeJson(doc, userJson);
+            if (!error)
             {
-                DynamicJsonBuffer jsonBuffer1;
-                JsonObject &json1 = jsonBuffer1.parseObject(json);
-
-                if (json1.success())
+                if (serializeJson(doc, xinaboxFile) == 0)
                 {
-                    //json1.prettyPrintTo(Serial);
-                    json1.printTo(xinaboxFile);
-                    xinaboxFile.close();
-                    SPIFFS.end();
-                    return true;
+                    debugPrint("Failed to write to file");
+                    return 0x24;
                 }
-                else
-                {
-                    Serial.print(SYNC); //Part of the provisioning standard
-                    Serial.print(SYNC); //Part of the provisioning standard
-                    Serial.println("Parsing of xinaboxuploader.json failed");
-                    return false;
-                }
+                xinaboxFile.close();
+                SPIFFS.end();
+                //debugPrint("SAVE DONE");
+                return 0xFF;                
             }
             else
             {
                 Serial.print(SYNC); //Part of the provisioning standard
                 Serial.print(SYNC); //Part of the provisioning standard
-                Serial.println("Failed to open xinaboxuploader.json");
-                return false;
+                Serial.print("deserializeJson() failed: ");
+                Serial.print(error.c_str());
+                return 0x23;
             }
         }
         else
         {
-            SPIFFS.end();
-            //CREATE_XINABOX_JSON();
-            return false;
+            Serial.print(SYNC); //Part of the provisioning standard
+            Serial.print(SYNC); //Part of the provisioning standard
+            Serial.println("Failed to open xinaboxuploader.json");
+            return 0x22;
         }
     }
     else
@@ -647,133 +526,177 @@ bool xProvision::writeFile(String json)
         Serial.print(SYNC); //Part of the provisioning standard
         Serial.println("Device Error, Rebooting xChip. Please Flash again.");
         SPIFFS.format();
-        //ESP.reset();
+        SPIFFS.end();
+        return 0x20;
     }
-    SPIFFS.end();
-    return true;
 }
 
-bool xProvision::readFile(String &json)
+/**
+ * @brief read current config file from DA
+ * 
+ * @param json to store config data in
+ * @return true 
+ * @return false 
+ */
+uint8_t xProvision::loadFile(String &json)
 {
-    //File xinaboxFile = SPIFFS.open("/xinaboxuploader.json", "r");
-
+    json = "";
+    
     if (SPIFFS.begin())
     {
-        //File xinaboxFile = SPIFFS.open("/xinaboxuploader.json", "r");
-
-        if (SPIFFS.exists("/xinaboxuploader.json")) // search for xinaboxuploader.json
+        if (SPIFFS.exists(jsonFileName)) 
         {
-            config_file_exists = true; //file exists, reading and loading
-
-            File xinaboxFile = SPIFFS.open("/xinaboxuploader.json", "r");
-
+            config_file_exists = true;
+            File xinaboxFile = SPIFFS.open(jsonFileName, "r");
             if (xinaboxFile)
             {
                 size_t size = xinaboxFile.size();
+            
                 std::unique_ptr<char[]> buf1(new char[size]);
                 xinaboxFile.readBytes(buf1.get(), size);
-                DynamicJsonBuffer jsonBuffer1;
-                JsonObject &json1 = jsonBuffer1.parseObject(buf1.get());
+                DynamicJsonDocument doc(size);
+                DeserializationError error = deserializeJson(doc, buf1.get());
                 xinaboxFile.close();
-                size_t len = json1.measureLength();
-                size_t sizeJson = len + 1;
-                if (json1.success() && (sizeJson > 3))
+                //config_file_exists = true;
+                //size_t len = serializeJson(doc, json);
+
+                if (!error)
                 {
-                    //json1.prettyPrintTo(Serial);
-                    json1.printTo(json);
+                    if (serializeJson(doc, json) == 0)
+                    {
+                        debugPrint("Failed to write to file");
+                        return 0x14;
+                    }
+
+                    // #ifdef DEBUG_SERIAL
+                    // Serial.print("loadFile() - ");
+                    // Serial.println(json);
+                    // #endif
+
+                    xinaboxFile.close();
                     SPIFFS.end();
                     provision_successful = true;
                     config_file_exists = true;
-                    return true;
+                    //debugPrint("LOAD DONE");
+                    return 0xFF;
                 }
                 else
                 {
-                    //Serial.print(SYNC); //Part of the provisioning standard
-                    //Serial.print(SYNC); //Part of the provisioning standard
-                    //Serial.println("Parsing of xinaboxuploader.json failed");
-                    return false;
+                    Serial.print(SYNC); //Part of the provisioning standard
+                    Serial.print(SYNC); //Part of the provisioning standard
+                    Serial.println("Parsing of config file failed");
+                    return 0x13;
                 }
             }
             else
             {
                 Serial.print(SYNC); //Part of the provisioning standard
                 Serial.print(SYNC); //Part of the provisioning standard
-                Serial.println("Failed to open xinaboxuploader.json");
-                return false;
+                Serial.println("Failed to open config file");
+                return 0x12;
             }
         }
         else
         {
             SPIFFS.end();
-            CREATE_XINABOX_JSON();
-            return false;
+            config_file_exists = false;
+            //errorHandlers(createJsonConfigFile());
+            return 0x11;
         }
     }
     else
     {
         Serial.print(SYNC); //Part of the provisioning standard
         Serial.print(SYNC); //Part of the provisioning standard
-        Serial.println("Rebooting xChip. Please Flash again.");
+        Serial.println("Reboot xChip. Please Flash again.");
         SPIFFS.format();
-        //ESP.reset();
+        SPIFFS.end();
+        return 0x10;
     }
-    SPIFFS.end();
-    return true;
 }
 
+/**
+ * @brief create a new config file
+ * 
+ * @return true 
+ * @return false 
+ */
 bool xProvision::createConfigFile(void)
 {
     return saveConfigFile();
 }
 
-bool xProvision::CREATE_XINABOX_JSON(void)
+/**
+ * @brief 
+ * 
+ * @return true 
+ * @return false 
+ */
+uint8_t xProvision::createJsonConfigFile(void)
 {
     //save the custom parameters to FS
     if (SPIFFS.begin())
     {
-        File xinaboxFile = SPIFFS.open("/xinaboxuploader.json", "w");
-        if (!xinaboxFile)
+        //Serial.println(jsonFileName);
+        File xinaboxFile = SPIFFS.open(jsonFileName, "w");
+        if (xinaboxFile)
         {
+            size_t n = sizeof(jsonFile);
+            DynamicJsonDocument doc(n);
+            DeserializationError error = deserializeJson(doc, jsonFile);
+            debugPrint("JsonFile below:");
+            debugPrint(jsonFile);
+
+            if (!error)
+            {
+                //json1.prettyPrintTo(Serial);
+                serializeJson(doc, xinaboxFile);
+                xinaboxFile.close();
+                SPIFFS.end();
+                return 0xFF;
+            }
+            else
+            {
+                return 0x03;
+            }
+        }
+        else
+        {
+            return 0x02;          
             Serial.print(SYNC); //Part of the provisioning standard
             Serial.print(SYNC); //Part of the provisioning standard
             Serial.println("Failed to create config file.");
             return false;
         }
-        else
-        {
-            DynamicJsonBuffer jsonBuffer1;
-            JsonObject &json1 = jsonBuffer1.parseObject(jsonFile);
-
-            if (json1.success())
-            {
-                //json1.prettyPrintTo(Serial);
-                json1.printTo(xinaboxFile);
-                xinaboxFile.close();
-                SPIFFS.end();
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
     }
     else
     {
-        return false;
+        return 0x01;
     }
-    return true;
 }
 
-bool xProvision::CHECK_XINABOX_JSON(String var1, String &var2)
+/**
+ * @brief 
+ * 
+ * @param var1 
+ * @param var2 
+ * @return true 
+ * @return false 
+ */
+bool xProvision::checkConfigDataForVariable(String var1, String &var2)
 {
-    DynamicJsonBuffer jsonBuffer2;
-    JsonObject &json2 = jsonBuffer2.parseObject(jsonFileStored);
-    if (json2.success())
+    size_t sizeJson = strlen(jsonFileStored.c_str());
+    char json[sizeJson];
+    strcpy(json, jsonFileStored.c_str());
+    DynamicJsonDocument doc(sizeJson * 2);
+    DeserializationError err = deserializeJson(doc, jsonFileStored);
+    JsonObject jsonObj = doc.as<JsonObject>();
+
+    if (!err)
     {
-        if (json2.containsKey(var1))
+        if (jsonObj.containsKey(var1))
         {
-            var2 = json2[var1].as<String>();
+            var2 = jsonObj[var1].as<String>();
             SPIFFS.end();
             return true;
         }
@@ -783,13 +706,143 @@ bool xProvision::CHECK_XINABOX_JSON(String var1, String &var2)
         }
     }
     else
-    {   
+    {
+        debugPrint("deserializeJson() failed: ");
+        debugPrint(err.c_str());
+        debugPrint("error occured");
         return false;
     }
+
     return false;
 }
 
+/**
+ * @brief reset the FS on CW01/02
+ * 
+ * @return true 
+ * @return false 
+ */
 bool xProvision::formatMemory(void)
 {
     SPIFFS.format();
+}
+
+/**
+ * @brief provide json file with custom name
+ * 
+ * @param filename 
+ */
+void xProvision::nameJsonFile(String filename)
+{
+    jsonFileName = filename;
+    //debugPrint(jsonFileName);
+}
+
+/**
+ * @brief 
+ * 
+ * @param _errCode 
+ * @return uint8_t 
+ */
+bool xProvision::errorHandlers(uint8_t _errCode)
+{
+	switch (_errCode)
+	{
+        case 0x01: // 
+            debugPrint("ERROR 0x01> createJsonConfigFile() SPIFFS FAIL");
+            return true;
+        case 0x02: // 
+            debugPrint("ERROR 0x02> createJsonConfigFile() failed to create file");
+            return true;
+        case 0x03: // 
+            debugPrint("ERROR 0x03> createJsonConfigFile() error with deserializeJson");
+            return true;     
+        case 0x10: // 
+            debugPrint("ERROR 0x10> loadFile() SPIFFS FAIL");
+            return true;
+        case 0x11: // 
+            debugPrint("ERROR 0x11> loadFile() json not found");
+            return true;
+        case 0x12: // 
+            debugPrint("ERROR 0x12> loadFile() unable to open file");
+            return true;
+        case 0x13: // 
+            debugPrint("ERROR 0x13> loadFile() jsonFile error");
+            return true;
+        case 0x14: // 
+            debugPrint("ERROR 0x14> loadFile() unable to serialize");
+            return true;                    
+        case 0x20: // 
+            debugPrint("ERROR 0x20> saveFile() SPIFFS FAIL");
+            return true;
+        case 0x21: // 
+            debugPrint("ERROR 0x21> saveFile() json not found");
+            return true;
+        case 0x22: // 
+            debugPrint("ERROR 0x22> saveFile() unable to open file");
+            return true;
+        case 0x23: // 
+            debugPrint("ERROR 0x23> saveFile() jsonFile error");
+            return true;
+        case 0x24: // 
+            debugPrint("ERROR 0x24> saveFile() unable to serialize");
+            return true; 
+        case 0x30: // 
+            debugPrint("ERROR 0x30> ");
+            return true;                
+        case 0x31: // 
+            debugPrint("ERROR 0x31> ");
+            return true;
+        case 0x32: //
+            debugPrint("ERROR 0x32> ");
+            return true;
+        case 0x33: //
+            debugPrint("ERROR 0x33> ");
+            return true;
+        case 0x34: // 
+            debugPrint("ERROR 0x34> ");
+            return true; 
+        case 0x35: // 
+            debugPrint("ERROR 0x35> ");
+            return true;
+        case 0x36: // 
+            debugPrint("ERROR 0x36> ");
+            return true;
+        case 0x37: // 
+            debugPrint("ERROR 0x37> ");
+            return true;         
+        case 0xFF:
+            //debugPrint("RUN_OK");
+            return false;
+        default:
+            return true;
+	}    
+}
+
+/**
+ * @brief 
+ * 
+ * @param _data 
+ */
+void xProvision::debugPrint(String _data)
+{
+#ifdef DEBUG_SERIAL
+    Serial.print("xProvision: ");
+	Serial.println(_data);
+#endif
+}
+
+/**
+ * @brief 
+ * 
+ * @param _data 
+ * @param _num 
+ */
+void xProvision::debugPrint(String _data, uint16_t _num)
+{
+#ifdef DEBUG_SERIAL
+    Serial.print("xProvision: ");
+	Serial.print(_data);
+	Serial.println(_num);
+#endif
 }

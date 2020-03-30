@@ -12,8 +12,9 @@ String ssid, password, auth;
 void setup() {
   // put your setup code here, to run once:
   prv.begin();
-  prv.addWiFi();
-  prv.addBlynkToken();
+  prv.addVariable("WiFi_SSID", "yourNetworkName");
+  prv.addVariable("WiFi_PSK", "yourNetworkPassword");
+  prv.addVariable("Blynk_Token", "yourBlynkToken");
   prv.transmit();
   //Writes this string, with the CRLF and SYNC prefixed and CRLF suffixed
   //$!${"WiFi_Network":"Your SSID","WiFi_Password":"Your PSK","Blynk_Token":"Long odd number"}
@@ -24,8 +25,9 @@ void setup() {
 
   if (prv.success())
   {
-    prv.getWiFi(ssid, password);
-    prv.getBlynkToken(auth);
+    prv.getVariable("WiFi_SSID", ssid);
+    prv.getVariable("WiFi_PSK", password);
+    prv.getVariable("Blynk_Token", auth);
   }
 
   Blynk.begin(auth.c_str(), ssid.c_str(), password.c_str());
