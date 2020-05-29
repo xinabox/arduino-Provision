@@ -32,7 +32,7 @@
 #define SYNC "$!$"
 #define PROV_VERSION "1.0.8"
 
-//#define DEBUG_SERIAL // used to enable serial prints
+#define DEBUG_SERIAL // used to enable serial prints
 
 class xProvision
 {

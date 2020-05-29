@@ -53,11 +53,6 @@ void xProvision::retransmit(void)
     {
         if (strcmp(jsonFileStored.c_str(), jsonFile.c_str()) != 0)
         {
-            // #ifdef DEBUG_SERIAL
-            // Serial.print("jsonFileStored - ");
-            // Serial.println(jsonFileStored);
-            // #endif
-
             if ((jsonFile[0] != '{') || (strncmp(jsonFileStored.c_str(), jsonFile.c_str(), 5) == 0))
             {
                 jsonFile = "";
@@ -89,13 +84,15 @@ bool xProvision::receive(void)
     unsigned long currentTime = millis();
     uint8_t tick_prov_wait = 0;
 
+    //Serial.println("Provision Started");
+
     while ((!Serial.available()) && (tick_prov_wait < 40))
     {
         if ((millis() - currentTime) > 250)
         {
             currentTime = millis();
             tick_prov_wait++;
-            debugPrint("wait timer - ", tick_prov_wait);
+            //debugPrint("wait timer", tick_prov_wait);
         }
     }
     if (tick_prov_wait == 40)
@@ -105,14 +102,12 @@ bool xProvision::receive(void)
         Serial.println("Provision Ended, Received Nothing!");
         return false;
     }
-    else
-    {
+    else {
         //Receive String to indicate provisioning will occur
-        //while (!Serial.available());
+        while (!Serial.available());
         
         String syncData = "";
         syncData = Serial.readStringUntil('\n');
-        syncData += '\0';
 
         if (strncmp(syncData.c_str(), "$!$$!$START", 11) == 0)
         {
@@ -125,8 +120,7 @@ bool xProvision::receive(void)
             //Serial.println(jsonInputStringUser);
             return saveConfigFile(jsonInputStringUser);
         }
-        else
-        {
+        else {
             Serial.println(syncData);
             Serial.print(SYNC); //Part of the provisioning standard
             Serial.print(SYNC); //Part of the provisioning standard
@@ -304,18 +298,24 @@ void xProvision::addCustomJson(String var1)
     const size_t size = sizeof(var1);
     DynamicJsonDocument doc(size);
     DeserializationError error = deserializeJson(doc, var1);
-
-    char json[size];
-    char _json[size];
-    size_t n = serializeJson(doc, json);
-
-    for (int i = 0; i <= n; i++)
+    debugPrint(var1);  
+    if(!error)
     {
-        _json[i] = json[i + 1];
+        char json[size];
+        char _json[size];
+        size_t n = serializeJson(doc, json);
+
+        for (int i = 0; i <= n; i++)
+        {
+            _json[i] = json[i + 1];
+        }
+        _json[n - 2] = '\0';
+        debugPrint(_json);
+        buildConfigJson(_json);
     }
-    _json[n - 2] = '\0';
-    //debugPrint(_json);
-    buildConfigJson(_json);
+    else {
+        debugPrint("Error");  
+    }    
 }
 
 /**
@@ -336,10 +336,6 @@ void xProvision::buildConfigJson(String _json)
  */
 void xProvision::merge_json(String obj1, String obj2)
 {
-    // debugPrint("MergeDocs");
-    // debugPrint(obj1);
-    // debugPrint(obj2);
-
     uint16_t len1 = strlen(obj1.c_str());
     uint16_t len2 = strlen(obj2.c_str());
 
@@ -352,10 +348,17 @@ void xProvision::merge_json(String obj1, String obj2)
         obj1[len1 - 2] = '\0';
         len1 = strlen(obj1.c_str());
     }
+    else {
+        //debugPrint("Fail 1");
+    }
+    
 
     if (obj1[0] == '{' && obj1[1] == '}')
     {
         //debugPrint("FixNewJson");
+    } 
+    else {
+        //debugPrint("Fail 2");
     }
 
     if (obj2[0] == '{')
@@ -366,6 +369,9 @@ void xProvision::merge_json(String obj1, String obj2)
         }
         obj2[len2 - 2] = '\0';
         len2 = strlen(obj2.c_str());
+    }
+    else {
+        //debugPrint("Fail 3");
     }
 
     total = len1 + len2 + 8;
@@ -395,8 +401,7 @@ void xProvision::merge_json(String obj1, String obj2)
         jsonFile = merged;
     }
     // merge single json to empty string
-    else if ((strlen(obj1.c_str()) == 0) && (obj2[0] == '\"'))
-    {
+    else if ((strlen(obj1.c_str()) == 0) && (obj2[0] == '\"')) {
         char merged[total];
         memset(merged, '\0', sizeof(merged));
 
@@ -410,8 +415,7 @@ void xProvision::merge_json(String obj1, String obj2)
 
         jsonFile = merged;
     }
-    else
-    {
+    else {
         Serial.print(SYNC);
         Serial.print(SYNC);
         Serial.println("Error in JSON");
@@ -439,7 +443,7 @@ bool xProvision::saveConfigFile(void)
     {
         return saveFile(jsonFile);
     }
-    return true;
+    return false;
 }
 
 /**
@@ -503,8 +507,7 @@ uint8_t xProvision::saveFile(String userJson)
                 //debugPrint("SAVE DONE");
                 return 0xFF;                
             }
-            else
-            {
+            else {
                 Serial.print(SYNC); //Part of the provisioning standard
                 Serial.print(SYNC); //Part of the provisioning standard
                 Serial.print("deserializeJson() failed: ");
@@ -512,16 +515,14 @@ uint8_t xProvision::saveFile(String userJson)
                 return 0x23;
             }
         }
-        else
-        {
+        else {
             Serial.print(SYNC); //Part of the provisioning standard
             Serial.print(SYNC); //Part of the provisioning standard
             Serial.println("Failed to open xinaboxuploader.json");
             return 0x22;
         }
     }
-    else
-    {
+    else {
         Serial.print(SYNC); //Part of the provisioning standard
         Serial.print(SYNC); //Part of the provisioning standard
         Serial.println("Device Error, Rebooting xChip. Please Flash again.");
@@ -580,32 +581,28 @@ uint8_t xProvision::loadFile(String &json)
                     //debugPrint("LOAD DONE");
                     return 0xFF;
                 }
-                else
-                {
+                else {
                     Serial.print(SYNC); //Part of the provisioning standard
                     Serial.print(SYNC); //Part of the provisioning standard
                     Serial.println("Parsing of config file failed");
                     return 0x13;
                 }
             }
-            else
-            {
+            else {
                 Serial.print(SYNC); //Part of the provisioning standard
                 Serial.print(SYNC); //Part of the provisioning standard
                 Serial.println("Failed to open config file");
                 return 0x12;
             }
         }
-        else
-        {
+        else {
             SPIFFS.end();
             config_file_exists = false;
             //errorHandlers(createJsonConfigFile());
             return 0x11;
         }
     }
-    else
-    {
+    else {
         Serial.print(SYNC); //Part of the provisioning standard
         Serial.print(SYNC); //Part of the provisioning standard
         Serial.println("Reboot xChip. Please Flash again.");
@@ -655,13 +652,11 @@ uint8_t xProvision::createJsonConfigFile(void)
                 SPIFFS.end();
                 return 0xFF;
             }
-            else
-            {
+            else {
                 return 0x03;
             }
         }
-        else
-        {
+        else {
             return 0x02;          
             Serial.print(SYNC); //Part of the provisioning standard
             Serial.print(SYNC); //Part of the provisioning standard
@@ -669,8 +664,7 @@ uint8_t xProvision::createJsonConfigFile(void)
             return false;
         }
     }
-    else
-    {
+    else {
         return 0x01;
     }
 }
@@ -685,6 +679,7 @@ uint8_t xProvision::createJsonConfigFile(void)
  */
 bool xProvision::checkConfigDataForVariable(String var1, String &var2)
 {
+    debugPrint(var1);
     size_t sizeJson = strlen(jsonFileStored.c_str());
     char json[sizeJson];
     strcpy(json, jsonFileStored.c_str());
@@ -700,20 +695,15 @@ bool xProvision::checkConfigDataForVariable(String var1, String &var2)
             SPIFFS.end();
             return true;
         }
-        else
-        {
-            return false;
-        }
+        debugPrint("containsKey() failed");
+        return false;
     }
-    else
-    {
+    else {
         debugPrint("deserializeJson() failed: ");
         debugPrint(err.c_str());
         debugPrint("error occured");
         return false;
     }
-
-    return false;
 }
 
 /**
